@@ -81,8 +81,8 @@ def main(parser_data):
 
     params_od = [p for p in model.parameters() if p.requires_grad]
 
-    for name, param in model.named_parameters():
-        print(name, param.shape)
+    # for name, param in model.named_parameters():
+    #     print(name, param.shape)
 
     optimizer = torch.optim.SGD(
         [{"params": model.dh_model.parameters(), "lr": 0.001},
