@@ -7,7 +7,6 @@ from lxml import etree
 
 
 class VOC2012DataSet(Dataset):
-    """读取解析PASCAL VOC2012数据集"""
 
     def __init__(self, voc_root, transforms, txt_name: str = "train.txt"):
         # self.root = os.path.join(voc_root, "VOCdevkit", "VOC2012")
@@ -32,6 +31,10 @@ class VOC2012DataSet(Dataset):
             exit(-1)
 
         self.transforms = transforms
+
+    def union(self, xml_list):
+        xml_list = [os.path.join(self.annotations_root, xml.strip() + ".xml") for xml in xml_list]
+        self.xml_list = [xml for xml in self.xml_list if xml in xml_list]
 
     def __len__(self):
         return len(self.xml_list)

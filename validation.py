@@ -10,7 +10,6 @@ import json
 import torch
 from tqdm import tqdm
 import numpy as np
-
 from faster_rcnn import transforms
 from faster_rcnn.network_files.faster_rcnn_framework import FasterRCNN
 from faster_rcnn.backbone.resnet50_fpn_model import resnet50_fpn_backbone
@@ -18,11 +17,10 @@ from faster_rcnn.my_dataset import VOC2012DataSet
 from faster_rcnn.train_utils.coco_utils import get_coco_api_from_dataset
 from faster_rcnn.train_utils.coco_eval import CocoEvaluator
 from aod_model import AODnet
-from train_model import ODHModel
+from model import ODHModel
 
 
 def create_model(num_classes):
-
     # resNet50+fpn+faster_RCNN
     backbone = resnet50_fpn_backbone()
     od_model = FasterRCNN(backbone=backbone, num_classes=6)
@@ -30,7 +28,6 @@ def create_model(num_classes):
     dh_model = AODnet()
 
     return ODHModel(od_model, dh_model)
-
 
 
 def summarize(self, catId=None):
@@ -105,6 +102,54 @@ def summarize(self, catId=None):
     return stats, print_info
 
 
+def validate(model, val_data_set, val_data_set_loader, category_index, device, mAP_list):
+    coco = get_coco_api_from_dataset(val_data_set)
+    iou_types = ["bbox"]
+    coco_evaluator = CocoEvaluator(coco, iou_types)
+    cpu_device = torch.device("cpu")
+
+    model.eval()
+    with torch.no_grad():
+        for image, targets in tqdm(val_data_set_loader, desc="validation..."):
+            # 将图片传入指定设备device
+            image = list(img.to(device) for img in image)
+
+            # inference
+            outputs = model(image)
+
+            outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+            res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+            coco_evaluator.update(res)
+
+    coco_evaluator.synchronize_between_processes()
+
+    # accumulate predictions from all images
+    coco_evaluator.accumulate()
+    coco_evaluator.summarize()
+
+    coco_eval = coco_evaluator.coco_eval["bbox"]
+    # calculate COCO info for all classes
+    coco_stats, print_coco = summarize(coco_eval)
+
+    # calculate voc info for every classes(IoU=0.5)
+    voc_map_info_list = []
+    for i in range(len(category_index)):
+        stats, _ = summarize(coco_eval, catId=i)
+        voc_map_info_list.append(" {:15}: {}".format(category_index[i + 1], stats[1]))
+
+    print_voc = "\n".join(voc_map_info_list)
+    print(print_voc)
+
+    print_txt = coco_evaluator.coco_eval[iou_types[0]].stats
+    coco_mAP = print_txt[0]
+    voc_mAP = print_txt[1]
+    if isinstance(mAP_list, list):
+        mAP_list.append(voc_mAP)
+    print('coco_mAP', coco_mAP, "voc_mAP", voc_mAP)
+    print(print_txt)
+    return coco_mAP, voc_mAP, voc_map_info_list
+
+
 def main(parser_data):
     device = torch.device(parser_data.device if torch.cuda.is_available() else "cpu")
     print("Using {} device training.".format(device.type))
@@ -145,7 +190,6 @@ def main(parser_data):
     assert os.path.exists(train_weights), "{} file dose not exist.".format(train_weights)
     model.load_state_dict(torch.load(train_weights, map_location=device)["model"])
     model.to(device)
-
 
     model.to(device)
 

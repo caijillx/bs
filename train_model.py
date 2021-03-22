@@ -1,6 +1,7 @@
 import os
 import torch
-from torch import nn
+from validation import validate
+from model import ODHModel
 from faster_rcnn import transforms
 from faster_rcnn.network_files.faster_rcnn_framework import FasterRCNN, FastRCNNPredictor
 from faster_rcnn.backbone.resnet50_fpn_model import resnet50_fpn_backbone
@@ -8,24 +9,7 @@ from faster_rcnn.my_dataset import VOC2012DataSet
 import torch.utils.data as Data
 from faster_rcnn.train_utils import train_eval_utils as utils
 from aod_model import AODnet
-
-
-# ODH = object_detection+dehaze_image
-
-
-class ODHModel(nn.Module):
-
-    def __init__(self, od_model, dh_model):
-        super(ODHModel, self).__init__()
-        self.dh_model = dh_model
-        self.od_model = od_model
-
-    def forward(self, images, targets=None):
-        images = list(images)
-        dh_images = [self.dh_model(image.unsqueeze(0)) for image in images]
-        images = [torch.cat([image, dh_image.squeeze(0)], dim=0) for image, dh_image in zip(images, dh_images)]
-        results = self.od_model(images, targets)
-        return results
+from config import *
 
 
 def create_model(num_classes, device):
@@ -33,7 +17,7 @@ def create_model(num_classes, device):
     # 训练自己数据集时不要修改这里的91，修改的是传入的num_classes参数
     od_model = FasterRCNN(backbone=backbone, num_classes=91)
     # 载入预训练模型权重
-    weights_dict = torch.load("faster_rcnn/backbone/fasterrcnn_resnet50_fpn_coco.pth", map_location=device)
+    weights_dict = torch.load(pretrained_res50_model_path, map_location=device)
     weights_dict["backbone.body.conv1.weight"] = weights_dict["backbone.body.conv1.weight"].repeat(1, 2, 1, 1)
     missing_keys, unexpected_keys = od_model.load_state_dict(weights_dict, strict=False)
     if len(missing_keys) != 0 or len(unexpected_keys) != 0:
@@ -56,7 +40,7 @@ def main(parser_data):
     data_transform = {
         "train": transforms.Compose([transforms.ToTensor(),
                                      transforms.RandomHorizontalFlip(0.5),
-                                     transforms.RandomCrop(0.5)],),
+                                     transforms.RandomCrop(0.5)], ),
         "val": transforms.Compose([transforms.ToTensor()])
     }
 
@@ -109,12 +93,13 @@ def main(parser_data):
     val_mAP = []
 
     for epoch in range(parser_data.epochs):
-        utils.train_one_epoch(model, optimizer, train_dataloader, device, epoch, train_loss=train_loss
-                              , train_lr=learning_rate, print_freq=50, warmup=True)
+        # utils.train_one_epoch(model, optimizer, train_dataloader, device, epoch, train_loss=train_loss
+        #                       , train_lr=learning_rate, print_freq=50, warmup=True)
 
-        lr_scheduler.step()
-
-        utils.evaluate(model, val_dataloader, device=device, mAP_list=val_mAP)
+        #lr_scheduler.step()
+        category_index = {1: 'person', 2: 'bus', 3:'bicycle', 4:'car', 5:'motorbike'}
+        validate(model, val_dataset, val_dataloader, category_index=category_index, device=device, mAP_list=val_mAP)
+        # utils.evaluate(model, val_dataloader, device=device, mAP_list=val_mAP)
 
         # save weights
         save_files = {
@@ -136,11 +121,6 @@ def main(parser_data):
 
 
 if __name__ == "__main__":
-    version = torch.version.__version__[:5]  # example: 1.6.0
-    # 因为使用的官方的混合精度训练是1.6.0后才支持的，所以必须大于等于1.6.0
-    if version < "1.6.0":
-        raise EnvironmentError("pytorch version must be 1.6.0 or above")
-
     import argparse
 
     parser = argparse.ArgumentParser(
