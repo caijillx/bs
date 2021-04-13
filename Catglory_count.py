@@ -20,8 +20,11 @@ def parse_obj(xml_path, filename):
     objects = []
     for obj in tree.findall('object'):
         obj_struct = {}
-        obj_struct['name'] = obj.find('name').text
-        objects.append(obj_struct)
+        if obj.find('difficult').text == "0":
+            obj_struct['name'] = obj.find('name').text
+            objects.append(obj_struct)
+
+    print(filename, objects)
     return objects
 
 
@@ -35,10 +38,10 @@ def read_image(image_path, filename):
 
 
 if __name__ == '__main__':
-    xml_path = r'/Users/llx/Desktop/RTTS/Annotations/'
+    xml_path = r'/Users/llx/Desktop/mmdetection-master/data/VOCdevkit/VOC2007/Annotations/'
     filenamess = os.listdir(xml_path)
     filenames = []
-    with open("/Users/llx/Desktop/RTTS/ImageSets/Main/val.txt", 'r') as f:
+    with open("/Users/llx/Desktop/mmdetection-master/data/VOCdevkit/VOC2007/ImageSets/Main/val.txt", 'r') as f:
         xml_names = [i.strip() for i in f.readlines()]
     print("一共有{}个xml", len(xml_names))
 
@@ -67,7 +70,6 @@ if __name__ == '__main__':
     for name in classnames:
         print('{}:{}个'.format(name, num_objs[name]))
     print('信息统计算完毕。')
-
 
 # train
 # bus:2348个

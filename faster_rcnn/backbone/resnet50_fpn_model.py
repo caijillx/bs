@@ -54,7 +54,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, blocks_num, num_classes=1000, include_top=True, norm_layer=None):
+    def __init__(self, block, blocks_num, num_classes=1000, include_top=True, norm_layer=None, repeat=False):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -62,9 +62,12 @@ class ResNet(nn.Module):
 
         self.include_top = include_top
         self.in_channel = 64
-
-        self.conv1 = nn.Conv2d(6, self.in_channel, kernel_size=7, stride=2,
-                               padding=3, bias=False)
+        if repeat:
+            self.conv1 = nn.Conv2d(6, self.in_channel, kernel_size=7, stride=2,
+                                   padding=3, bias=False)
+        else:
+            self.conv1 = nn.Conv2d(3, self.in_channel, kernel_size=7, stride=2,
+                                   padding=3, bias=False)
         self.bn1 = norm_layer(self.in_channel)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -345,19 +348,17 @@ class BackboneWithFPN(nn.Module):
         return x
 
 
-def resnet50_fpn_backbone():
+def resnet50_fpn_backbone(repeat=False):
     # FrozenBatchNorm2d的功能与BatchNorm2d类似，但参数无法更新
     # norm_layer=misc.FrozenBatchNorm2d
     resnet_backbone = ResNet(Bottleneck, [3, 4, 6, 3],
-                             include_top=False)  # 此处省去 average pooling layer 以及 fc layer
+                             include_top=False, repeat=repeat)  # 此处省去 average pooling layer 以及 fc layer
 
     # freeze layers
     # 冻结layer1及其之前的所有底层权重（基础通用特征）
     # for name, parameter in resnet_backbone.named_parameters():
     #     if 'layer2' not in name and 'layer3' not in name and 'layer4' not in name:
     #         parameter.requires_grad_(False)
-
-
 
     return_layers = {'layer1': '0', 'layer2': '1', 'layer3': '2', 'layer4': '3'}
 

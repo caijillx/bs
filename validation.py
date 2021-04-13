@@ -248,19 +248,19 @@ if __name__ == "__main__":
         description=__doc__)
 
     # 使用设备类型
-    parser.add_argument('--device', default='cuda', help='device')
+    parser.add_argument('--device', default='cpu', help='device')
 
     # 检测目标类别数
-    parser.add_argument('--num-classes', type=int, default='20', help='number of classes')
+    parser.add_argument('--num-classes', type=int, default='6', help='number of classes')
 
     # 数据集的根目录(VOC2012根目录)
-    parser.add_argument('--data-path', default='./', help='dataset root')
+    parser.add_argument('--data-path', default='/Users/llx/Desktop/RTTS', help='dataset root')
 
     # 训练好的权重文件
-    parser.add_argument('--weights', default='./save_weights/model.pth', type=str, help='training weights')
+    parser.add_argument('--weights', default='/Users/llx/Downloads/AOD-model-6.pth', type=str, help='training weights')
 
     # batch size
-    parser.add_argument('--batch_size', default=4, type=int, metavar='N',
+    parser.add_argument('--batch_size', default=2, type=int, metavar='N',
                         help='batch size when training.')
 
     args = parser.parse_args()
