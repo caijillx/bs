@@ -33,6 +33,9 @@ image_std = [0.193, 0.194, 0.198, 0.195, 0.210, 0.219]
 
 k = 10
 
+type = input("请输入测试模型种类:ohd代表去雾+faster_rcnn，normal代表正常faster_rcnn")
+start = input("请输入从第几轮开始测试:(防止重新测试)")
+
 
 def get_k_fold_data(k, i, dataset):
     assert k > 1
@@ -59,7 +62,7 @@ def get_k_fold_data(k, i, dataset):
 
 
 # 如果type为ohd，则创建AODNet+Faster_rcnn合体模型,否则则创建只有faster_rcnn的模型。
-def create_model(num_classes, device="cpu", type="ohd"):
+def create_model(num_classes, device="cpu", type=type):
     if type == "ohd":
         # 因为需要连接图片和去雾后的图片，需要两层，repeat参数改为True
         backbone = resnet50_fpn_backbone(repeat=True)
@@ -101,7 +104,7 @@ voc_mAPs = []
 # 单类别IOU取0.5
 voc_cat_mAPS = []
 
-for i in range(k):
+for i in range(start, k):
     print("正在测试第{}轮.......".format(i))
     train_dataset, val_dataset = get_k_fold_data(k, i, dataset)
     model = create_model(num_classes=num_classes)
@@ -113,13 +116,17 @@ for i in range(k):
     val_dataloader = Data.DataLoader(
         val_dataset, batch_size=2, shuffle=False, collate_fn=train_dataset.collate_fn
     )
-
-    optimizer = torch.optim.SGD(
-        [{"params": model.dh_model.parameters(), "lr": 0.001},
-         {"params": model.od_model.parameters(), "lr": 0.005}
-         ]
-        , lr=0.005, momentum=0.9, weight_decay=0.0005
-    )
+    if type == "ohd":
+        optimizer = torch.optim.SGD(
+            [{"params": model.dh_model.parameters(), "lr": 0.001},
+             {"params": model.od_model.parameters(), "lr": 0.005}
+             ]
+            , lr=0.005, momentum=0.9, weight_decay=0.0005
+        )
+    else:
+        params = [p for p in model.parameters() if p.requires_grad]
+        optimizer = torch.optim.SGD(params, lr=0.005,
+                                    momentum=0.9, weight_decay=0.0005)
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=2, gamma=0.66
