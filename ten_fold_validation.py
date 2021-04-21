@@ -2,14 +2,10 @@ import torch.utils.data as Data
 from config import *
 from validation import validate
 from faster_rcnn import transforms
-from faster_rcnn.network_files.faster_rcnn_framework import FasterRCNN
-from faster_rcnn.backbone.resnet50_fpn_model import resnet50_fpn_backbone
 from faster_rcnn.my_dataset import VOC2012DataSet
 import torch
 from faster_rcnn.train_utils import train_eval_utils as utils
-from aod_model import AODnet
-from model import ODHModel
-from faster_rcnn.network_files.faster_rcnn_framework import FasterRCNN, FastRCNNPredictor
+from model import create_model, create_optimizer
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -23,9 +19,6 @@ data_transform = {
     "trainval": transforms.Compose([transforms.ToTensor()]),
 }
 
-transforms = transforms.Compose([transforms.RandomHorizontalFlip(0.5),
-                                 transforms.RandomCrop(0.5)], )
-
 dataset = VOC2012DataSet(VOC_root, data_transform["trainval"], "trainval.txt")
 
 image_mean = [0.551, 0.548, 0.541, 0.384, 0.378, 0.372]
@@ -34,11 +27,12 @@ image_std = [0.193, 0.194, 0.198, 0.195, 0.210, 0.219]
 k = 10
 
 type = input("请输入测试模型种类:ohd代表去雾+faster_rcnn，normal代表正常faster_rcnn")
-start = input("请输入从第几轮开始测试:(防止重新测试)")
+start = int(input("请输入从第几轮开始测试:(防止重新测试)"))
 
 
 def get_k_fold_data(k, i, dataset):
     assert k > 1
+    # 读取所有的xml路径
     with open(VOC_root + "/ImageSets/Main/trainval.txt", 'r') as f:
         xml_list = f.readlines()
     print(len(xml_list))
@@ -61,42 +55,6 @@ def get_k_fold_data(k, i, dataset):
     return train_dataset, val_dataset
 
 
-# 如果type为ohd，则创建AODNet+Faster_rcnn合体模型,否则则创建只有faster_rcnn的模型。
-def create_model(num_classes, device="cpu", type=type):
-    if type == "ohd":
-        # 因为需要连接图片和去雾后的图片，需要两层，repeat参数改为True
-        backbone = resnet50_fpn_backbone(repeat=True)
-        model = FasterRCNN(backbone=backbone, num_classes=91, image_mean=image_mean, image_std=image_std)
-        weights_dict = torch.load(pretrained_res50_model_path, map_location=device)
-        # 训练自己数据集时不要修改这里的91，修改的是传入的num_classes参数
-        weights_dict["backbone.body.conv1.weight"] = weights_dict["backbone.body.conv1.weight"].repeat(1, 2, 1, 1)
-        missing_keys, unexpected_keys = model.load_state_dict(weights_dict, strict=False)
-        if len(missing_keys) != 0 or len(unexpected_keys) != 0:
-            print("missing_keys: ", missing_keys)
-            print("unexpected_keys: ", unexpected_keys)
-
-        in_features = model.roi_heads.box_predictor.cls_score.in_features
-        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-        dh_model = AODnet()
-        dh_model.load_state_dict(torch.load(pretrained_aod_model_path, map_location=device))
-        print("正在生成去雾+目标检测模型......")
-        return ODHModel(model, dh_model)
-    else:
-        backbone = resnet50_fpn_backbone()
-        model = FasterRCNN(backbone=backbone, num_classes=91, image_mean=image_mean[0:3], image_std=image_std[0:3])
-        weights_dict = torch.load(pretrained_res50_model_path, map_location=device)
-        # 训练自己数据集时不要修改这里的91，修改的是传入的num_classes参数
-        missing_keys, unexpected_keys = model.load_state_dict(weights_dict, strict=False)
-        if len(missing_keys) != 0 or len(unexpected_keys) != 0:
-            print("missing_keys: ", missing_keys)
-            print("unexpected_keys: ", unexpected_keys)
-
-        in_features = model.roi_heads.box_predictor.cls_score.in_features
-        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-        print("正在生成目标检测模型......")
-        return model
-
-
 # IOU取0.5-0.95 step 0.05
 coco_mAPs = []
 # IOU取0.5
@@ -107,7 +65,8 @@ voc_cat_mAPS = []
 for i in range(start, k):
     print("正在测试第{}轮.......".format(i))
     train_dataset, val_dataset = get_k_fold_data(k, i, dataset)
-    model = create_model(num_classes=num_classes)
+    print("测试集数量：", len(train_dataset), "训练集数量：", len(val_dataset))
+    model = create_model(num_classes=num_classes, type=type)
     model.to(device)
     train_dataloader = Data.DataLoader(
         train_dataset, batch_size=2, shuffle=True, collate_fn=train_dataset.collate_fn
@@ -116,17 +75,7 @@ for i in range(start, k):
     val_dataloader = Data.DataLoader(
         val_dataset, batch_size=2, shuffle=False, collate_fn=train_dataset.collate_fn
     )
-    if type == "ohd":
-        optimizer = torch.optim.SGD(
-            [{"params": model.dh_model.parameters(), "lr": 0.001},
-             {"params": model.od_model.parameters(), "lr": 0.005}
-             ]
-            , lr=0.005, momentum=0.9, weight_decay=0.0005
-        )
-    else:
-        params = [p for p in model.parameters() if p.requires_grad]
-        optimizer = torch.optim.SGD(params, lr=0.005,
-                                    momentum=0.9, weight_decay=0.0005)
+    optimizer = create_optimizer(model, type=type)
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=2, gamma=0.66

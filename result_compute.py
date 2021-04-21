@@ -6,13 +6,15 @@
 
 import json
 
-result = json.load(open("ten_fold_validation_result.json", 'r'))
+file_name = "ten_fold_validation_result_faster_rcnn.json"
+print(file_name)
+result = json.load(open(file_name, 'r'))
 for index, data in result.items():
     print("now validata %s" % index)
     cat_map = data["categlory_mAP"]
     voc_map = data["voc_mAP"]
     coco_map = data["coco_mAP"]
-    if abs(sum(cat_map) / 5 - voc_map) < 1e-4:
+    if abs(sum(cat_map) / 5 - voc_map) < 1e-6:
         print("validation succeed")
     else:
         print(sum(cat_map) / 5)

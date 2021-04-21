@@ -63,11 +63,6 @@ def main(parser_data):
 
     model.to(device)
 
-    params_od = [p for p in model.parameters() if p.requires_grad]
-
-    # for name, param in model.named_parameters():
-    #     print(name, param.shape)
-
     optimizer = torch.optim.SGD(
         [{"params": model.dh_model.parameters(), "lr": 0.001},
          {"params": model.od_model.parameters(), "lr": 0.005}
@@ -76,7 +71,7 @@ def main(parser_data):
     )
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=5, gamma=0.33
+        optimizer, step_size=2, gamma=0.66
     )
 
     # 如果指定了上次训练保存的权重文件地址，则接着上次结果接着训练
@@ -96,10 +91,10 @@ def main(parser_data):
         # utils.train_one_epoch(model, optimizer, train_dataloader, device, epoch, train_loss=train_loss
         #                       , train_lr=learning_rate, print_freq=50, warmup=True)
 
-        #lr_scheduler.step()
-        category_index = {1: 'person', 2: 'bus', 3:'bicycle', 4:'car', 5:'motorbike'}
+        # lr_scheduler.step()
+        category_index = {1: 'person', 2: 'bus', 3: 'bicycle', 4: 'car', 5: 'motorbike'}
         validate(model, val_dataset, val_dataloader, category_index=category_index, device=device, mAP_list=val_mAP)
-        # utils.evaluate(model, val_dataloader, device=device, mAP_list=val_mAP)
+        utils.evaluate(model, val_dataloader, device=device, mAP_list=val_mAP)
 
         # save weights
         save_files = {

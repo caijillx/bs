@@ -1,26 +1,21 @@
 import os
 import time
 import json
-
 import torch
-import torchvision
 from PIL import Image
 import matplotlib.pyplot as plt
-
 from train_model import ODHModel
 from torchvision import transforms
-from faster_rcnn.network_files.faster_rcnn_framework import FasterRCNN, FastRCNNPredictor
+from faster_rcnn.network_files.faster_rcnn_framework import FasterRCNN
 from faster_rcnn.backbone.resnet50_fpn_model import resnet50_fpn_backbone
-from faster_rcnn.network_files.rpn_function import AnchorsGenerator
-from faster_rcnn.backbone.mobilenetv2_model import MobileNetV2
 from faster_rcnn.draw_box_utils import draw_box
 from aod_model import AODnet
 
-def create_model(num_classes):
 
+def create_model(num_classes):
     # resNet50+fpn+faster_RCNN
-    backbone = resnet50_fpn_backbone()
-    od_model = FasterRCNN(backbone=backbone, num_classes=6)
+    backbone = resnet50_fpn_backbone(repeat=True)
+    od_model = FasterRCNN(backbone=backbone, num_classes=num_classes)
     # AODnet
     dh_model = AODnet()
 
@@ -49,7 +44,7 @@ def main():
     category_index = {v: k for k, v in class_dict.items()}
 
     # load image
-    original_img = Image.open("/Users/llx/Desktop/RTTS/JPEGImages/HEB_Google_154.png")
+    original_img = Image.open("/Users/llx/Desktop/dehaze_object_detection/test_images/test3.jpeg")
 
     # from pil image to tensor, do not normalize image
     data_transform = transforms.Compose([transforms.ToTensor()])
@@ -75,19 +70,13 @@ def main():
         if len(predict_boxes) == 0:
             print("没有检测到任何目标!")
 
-        draw_box(original_img,
-                 predict_boxes,
-                 predict_classes,
-                 predict_scores,
-                 category_index,
-                 thresh=0.5,
-                 line_thickness=3)
+        draw_box(original_img, predict_boxes, predict_classes, predict_scores, category_index,
+                 thresh=0.5, line_thickness=3)
         plt.imshow(original_img)
         plt.show()
         # 保存预测的图片结果
-        original_img.save("test_result.jpg")
+        original_img.save("result_images/test_result3.jpg")
 
 
 if __name__ == '__main__':
     main()
-

@@ -359,4 +359,11 @@ class FasterRCNN(FasterRCNNBase):
         # 对数据进行标准化，缩放，打包成batch等处理部分
         transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
 
+        # backbone(resnet+fpn)  images.tensor -> features
+        # rpn(anchor generator,rpn-head)  images, targets, features -> proposals, proposal_losses
+        # roi_heads(       box_roi_pool,   # Multi-scale RoIAlign pooling
+        #                  box_head,       # TwoMLPHead
+        #                  box_predictor,  # FastRCNNPredictor
+        #          )
+        # transform(normalize + resize) -> images targets
         super(FasterRCNN, self).__init__(backbone, rpn, roi_heads, transform)

@@ -29,7 +29,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq,
         # dh_images = [dh_model(image.unsqueeze(0)) for image in images]
         # images = [torch.cat([image, dh_image.squeeze(0)], dim=0) for image, dh_image in zip(images, dh_images)]
 
-        # TODO 此处去除了normalize 因为6通道导致图片无法normalize
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
         # 混合精度训练上下文管理器，如果在CPU环境中不起任何作用

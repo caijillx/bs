@@ -210,6 +210,7 @@ class GeneralizedRCNNTransform(nn.Module):
                 targets=None  # type: Optional[List[Dict[str, Tensor]]]
                 ):
         # type: (...) -> Tuple[ImageList, Optional[List[Dict[str, Tensor]]]]
+        # normalize、resize
         images = [img for img in images]
         for i in range(len(images)):
             image = images[i]
