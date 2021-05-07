@@ -44,7 +44,7 @@ def main():
     category_index = {v: k for k, v in class_dict.items()}
 
     # load image
-    original_img = Image.open("/Users/llx/Desktop/dehaze_object_detection/test_images/test3.jpeg")
+    original_img = Image.open("/Users/llx/Desktop/dehaze_object_detection/test_images/test5.jpeg")
 
     # from pil image to tensor, do not normalize image
     data_transform = transforms.Compose([transforms.ToTensor()])
@@ -75,7 +75,7 @@ def main():
         plt.imshow(original_img)
         plt.show()
         # 保存预测的图片结果
-        original_img.save("result_images/test_result3.jpg")
+        original_img.save("result_images/test_result5.jpg")
 
 
 if __name__ == '__main__':

@@ -58,13 +58,13 @@ def main(parser_data):
         # 执行评测
         utils.evaluate(model, val_dataloader, device=device, mAP_list=val_mAP)
 
-        # save weights
+       # save weights
         save_files = {
             'od_model': model.state_dict(),
             'optimizer_od': optimizer.state_dict(),
             'lr_scheduler_od': lr_scheduler.state_dict(),
             'epoch': epoch}
-        torch.save(save_files, "./save_weights/{}-resNetFpn-model-{}.pth".format(parser_data.type, epoch))
+        torch.save(save_files, "./save_weights/{}-model-{}.pth".format(parser_data.type, epoch))
 
     # 画出loss和lr的曲线
     if len(train_loss) != 0 and len(learning_rate) != 0:
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', default=2, type=int, metavar='N',
                         help='batch size when training.')
     # 训练的模型类型
-    parser.add_argument('--type', default="ohd", type=str, help='model type when training.')
+    parser.add_argument('--type', default="vgg", type=str, help='model type when training.')
 
     args = parser.parse_args()
     print(args)

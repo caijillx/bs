@@ -8,12 +8,12 @@ class VGG(nn.Module):
         self.features = features
         self.classifier = nn.Sequential(
             nn.Dropout(p=0.5),
-            nn.Linear(512*7*7, 2048),
+            nn.Linear(512*7*7, 4096),
             nn.ReLU(True),
             nn.Dropout(p=0.5),
-            nn.Linear(2048, 2048),
+            nn.Linear(4096, 4096),
             nn.ReLU(True),
-            nn.Linear(2048, class_num)
+            nn.Linear(4096, class_num)
         )
         if init_weights and weights_path is None:
             self._initialize_weights()

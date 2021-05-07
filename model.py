@@ -1,9 +1,12 @@
+import torchvision
 from torch import nn
 from config import *
 from faster_rcnn.backbone.resnet50_fpn_model import resnet50_fpn_backbone
 import torch
 from aod_model import AODnet
 from faster_rcnn.network_files.faster_rcnn_framework import FasterRCNN, FastRCNNPredictor
+from faster_rcnn.backbone.vgg_model import vgg
+from faster_rcnn.network_files.rpn_function import AnchorsGenerator
 
 
 class ODHModel(nn.Module):
@@ -32,20 +35,18 @@ def create_model(num_classes, image_mean=None, image_std=None, device="cpu", typ
         backbone = resnet50_fpn_backbone(repeat=True)
         model = FasterRCNN(backbone=backbone, num_classes=91, image_mean=image_mean, image_std=image_std)
         weights_dict = torch.load(pretrained_res50_model_path, map_location=device)
-        # 训练自己数据集时不要修改这里的91，修改的是传入的num_classes参数
         weights_dict["backbone.body.conv1.weight"] = weights_dict["backbone.body.conv1.weight"].repeat(1, 2, 1, 1)
         missing_keys, unexpected_keys = model.load_state_dict(weights_dict, strict=False)
         if len(missing_keys) != 0 or len(unexpected_keys) != 0:
             print("missing_keys: ", missing_keys)
             print("unexpected_keys: ", unexpected_keys)
-
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
         dh_model = AODnet()
         dh_model.load_state_dict(torch.load(pretrained_aod_model_path, map_location=device))
-        print("正在生成去雾+目标检测模型......")
+        print("正在生成联合模型......")
         return ODHModel(model, dh_model)
-    else:
+    elif type == "resnet":
         if image_mean is None:
             image_mean = [0.485, 0.456, 0.406]
         if image_std is None:
@@ -53,7 +54,6 @@ def create_model(num_classes, image_mean=None, image_std=None, device="cpu", typ
         backbone = resnet50_fpn_backbone()
         model = FasterRCNN(backbone=backbone, num_classes=91, image_mean=image_mean[0:3], image_std=image_std[0:3])
         weights_dict = torch.load(pretrained_res50_model_path, map_location=device)
-        # 训练自己数据集时不要修改这里的91，修改的是传入的num_classes参数
         missing_keys, unexpected_keys = model.load_state_dict(weights_dict, strict=False)
         if len(missing_keys) != 0 or len(unexpected_keys) != 0:
             print("missing_keys: ", missing_keys)
@@ -61,8 +61,29 @@ def create_model(num_classes, image_mean=None, image_std=None, device="cpu", typ
 
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-        print("正在生成目标检测模型......")
+        print("正在生成resnet50+fpn模型......")
         return model
+    elif type == "vgg":
+        if image_mean is None:
+            image_mean = [0.485, 0.456, 0.406]
+        if image_std is None:
+            image_std = [0.229, 0.224, 0.225]
+        backbone = vgg(weights_path="/Users/llx/Downloads/vgg16.pth").features
+        backbone.out_channels = 512
+        anchor_generator = AnchorsGenerator(sizes=((32, 64, 128, 256, 512),),
+                                            aspect_ratios=((0.5, 1.0, 2.0),))
+
+        roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'],  # 在哪些特征层上进行roi pooling
+                                                        output_size=[7, 7],  # roi_pooling输出特征矩阵尺寸
+                                                        sampling_ratio=2)  # 采样率
+        model = FasterRCNN(backbone=backbone,
+                           num_classes=num_classes,
+                           rpn_anchor_generator=anchor_generator,
+                           box_roi_pool=roi_pooler, image_mean=image_mean[0:3], image_std=image_std[0:3])
+        print("正在生成vgg16模型......")
+        return model
+    else:
+        raise Exception("请输入vgg、ohd、resnet种的一种")
 
 
 def create_optimizer(model, type="ohd"):
